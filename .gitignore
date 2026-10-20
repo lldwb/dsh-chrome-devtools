@@ -1,0 +1,8 @@
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+.scratch/
+
+# 团队内部实现契约（含本机路径与协作分工，不属于公开仓库内容；用户文档见 README）
+docs/CONTRACT.md
