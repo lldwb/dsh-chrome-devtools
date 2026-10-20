@@ -1,0 +1,10 @@
+{
+  "meta": {
+    "title": "Chrome browser",
+    "description": "Let the agent drive Chrome: navigate, screenshot, snapshot, click, fill, evaluate JS, and inspect console and network; supports four connection schemes (launch / autoConnect the current browser / debugging port / WebSocket endpoint) that can be switched at any time."
+  },
+  "settings": {
+    "title": "Chrome browser",
+    "description": "Choose how the plugin connects to Chrome, configure the debugging endpoint and launch options, test the connection, and inspect the status."
+  }
+}

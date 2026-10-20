@@ -1,0 +1,27 @@
+# dsh-chrome-devtools —— Loader 补丁层。
+#
+# 插入一行 Host 插件（行 id 同时是设置页的命名空间）。
+#
+# config 会被 id 定向 patch 整块替换，所以这里把每个字段都写全：用户想在 profile 层覆盖时
+# 必须重述全部字段（见 docs/CONTRACT.md §5.1）。
+#
+# 默认 scheme 选 auto-connect：本机实测「用户正在用的 Chrome」已经可以通过
+# DevToolsActivePort 直连，能保留登录态；不可用时插件会明确报错并提示改用 launch。
+- insert:
+    - id: chrome-devtools
+      name: dsh-chrome-devtools
+      config:
+        scheme: auto-connect
+        browserUrl: 'http://127.0.0.1:9222'
+        wsEndpoint: ''
+        wsHeaders: ''
+        channel: stable
+        executablePath: ''
+        headless: false
+        isolated: true
+        userDataDir: ''
+        viewport: 1280x800
+        toolset: full
+        screenshotDir: ''
+        connectTimeoutMs: 15000
+        actionTimeoutMs: 10000

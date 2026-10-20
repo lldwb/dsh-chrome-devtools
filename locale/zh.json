@@ -1,0 +1,10 @@
+{
+  "meta": {
+    "title": "Chrome 浏览器",
+    "description": "让 agent 直接操作 Chrome：导航、截图、快照、点击、填表、执行 JS、看控制台与网络请求；支持四种连接方案（新浏览器 / 复用当前浏览器 / 调试端口 / WebSocket 直连）并可随时切换。"
+  },
+  "settings": {
+    "title": "Chrome 浏览器",
+    "description": "选择 Chrome 连接方案，配置调试端点与启动参数，测试连接并查看状态。"
+  }
+}

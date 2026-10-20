@@ -1,0 +1,76 @@
+{
+  "name": "dsh-chrome-devtools",
+  "version": "0.1.0",
+  "description": "在 DeepSeek Harness 里操作 Chrome：把 chrome-devtools-mcp 的四种连接方案（新浏览器 / autoConnect 复用当前浏览器 / browser-url / wsEndpoint）做成可切换的 Host 插件，零外部运行时依赖。",
+  "type": "module",
+  "license": "MIT",
+  "private": true,
+  "icon": "./icon.svg",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "lib/*.mjs",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "test/*"
+  ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.mjs\""
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "cordis",
+    "plugin",
+    "bundle",
+    "chrome",
+    "chrome-devtools",
+    "cdp",
+    "browser",
+    "automation",
+    "mcp"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lldwb/dsh-chrome-devtools.git"
+  },
+  "homepage": "https://github.com/lldwb/dsh-chrome-devtools#readme",
+  "bugs": {
+    "url": "https://github.com/lldwb/dsh-chrome-devtools/issues"
+  },
+  "meta": {
+    "title": "Chrome 浏览器",
+    "description": "让 agent 直接操作 Chrome：导航、截图、快照、点击、填表、执行 JS、看控制台与网络请求；支持四种连接方案（新浏览器 / 复用当前浏览器 / 调试端口 / WebSocket 直连）并可随时切换。"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-plugin-manager",
+        "@deepseek-ai/dsh-api-remotes"
+      ]
+    }
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "^3.18.5"
+  }
+}
