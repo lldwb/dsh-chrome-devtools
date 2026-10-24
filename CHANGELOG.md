@@ -2,6 +2,20 @@
 
 本文件记录 `dsh-chrome-devtools` 的所有重要变更。
 
+## 0.1.1 — 2026-10-24
+
+修复 Windows 上「方案 A（启动全新浏览器）的 Chrome 窗口不可见」的 bug。
+
+- **根因**：`launchChrome` 用 `spawn(..., { windowsHide: true })` 启动 Chrome。Windows 会让
+  Chrome 继承「隐藏窗口」的启动信息：主窗口照常创建（hwnd 存在、标题
+  `about:blank - Google Chrome`、尺寸也对），但 `IsWindowVisible` 为 `false`。结果是屏幕上
+  只剩一块白色残影，用户会误以为插件启动了个坏窗口。
+- **修复**：有头模式改用 `windowsHide: false`（`stdio: 'ignore'` 已足够，不需要靠它隐藏控制台）；
+  headless 模式本身不建窗口，与该选项无关。
+- **验证**：同一套启动参数只改这一个选项，实测 `windowsHide=true → visible=False`、
+  `false → visible=True`；修复后用插件自己的 `launchChrome` 冷启动，窗口
+  `visible=True 1281×801 title='about:blank - Google Chrome'`。`node --test` 295/295 通过。
+
 ## 0.1.0 — 2026-10-20
 
 首个版本。

@@ -1,6 +1,6 @@
 {
   "name": "dsh-chrome-devtools",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "在 DeepSeek Harness 里操作 Chrome：把 chrome-devtools-mcp 的四种连接方案（新浏览器 / autoConnect 复用当前浏览器 / browser-url / wsEndpoint）做成可切换的 Host 插件，零外部运行时依赖。",
   "type": "module",
   "license": "MIT",
