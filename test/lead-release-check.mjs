@@ -21,7 +21,7 @@ const expectedFiles = [
   'index.js',
   'client.js',
   'cordis.patch.yml',
-  'icon.png',
+  'icon.svg',
   'README.md',
   'CHANGELOG.md',
   'LICENSE',
