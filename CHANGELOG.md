@@ -2,6 +2,12 @@
 
 本文件记录 `dsh-chrome-devtools` 的所有重要变更。
 
+## 0.1.3 — 2026-10-27
+
+插件图标改为手绘 SVG，对齐 dsh 官方插件图标的矢量语言（36×36、透明底、官方蓝色渐变、同一描边与留白）：
+`icon.png` → `icon.svg`，`package.json` 的 `icon` 与 `files`、`test/lead-release-check.mjs` 的
+`expectedFiles` 同步更新。纯资源与清单改动，不涉及代码逻辑。
+
 ## 0.1.2 — 2026-10-27
 
 插件图标换成 gpt-image-2.5 生成的 PNG 图标（256×256，圆角透明）：`icon.svg` → `icon.png`，
