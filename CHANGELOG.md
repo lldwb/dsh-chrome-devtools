@@ -2,6 +2,12 @@
 
 本文件记录 `dsh-chrome-devtools` 的所有重要变更。
 
+## 0.1.2 — 2026-10-27
+
+插件图标换成 gpt-image-2.5 生成的 PNG 图标（256×256，圆角透明）：`icon.svg` → `icon.png`，
+`package.json` 的 `icon` 与 `files`、`test/lead-release-check.mjs` 的 `expectedFiles` 同步更新。
+纯资源与清单改动，不涉及代码逻辑。
+
 ## 0.1.1 — 2026-10-24
 
 修复 Windows 上「方案 A（启动全新浏览器）的 Chrome 窗口不可见」的 bug。
