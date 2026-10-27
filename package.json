@@ -1,11 +1,11 @@
 {
   "name": "dsh-chrome-devtools",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "在 DeepSeek Harness 里操作 Chrome：把 chrome-devtools-mcp 的四种连接方案（新浏览器 / autoConnect 复用当前浏览器 / browser-url / wsEndpoint）做成可切换的 Host 插件，零外部运行时依赖。",
   "type": "module",
   "license": "MIT",
   "private": true,
-  "icon": "./icon.svg",
+  "icon": "./icon.png",
   "main": "./index.js",
   "exports": {
     ".": "./index.js",
@@ -19,7 +19,7 @@
     "lib/*.mjs",
     "cordis.patch.yml",
     "locale/*.json",
-    "icon.svg",
+    "icon.png",
     "README.md",
     "CHANGELOG.md",
     "LICENSE",
