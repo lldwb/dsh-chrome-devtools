@@ -171,3 +171,20 @@ Node 22/24 内置的全局 `WebSocket` 构造函数是 `new WebSocket(url, proto
     → `browser_disconnect(closeBrowser:false)` 后用户浏览器保持运行。
 - **设置页 UI 回归**：web 沙箱 + headless Chrome 打开「设置 → 插件 → Chrome 浏览器」，切换方案、点「测试连接」验证
   RPC 通道（非 405）与状态/探测区渲染。
+
+### DSH 0.2.2-rc.1 回归（2026-11-06）
+
+适配目标：已安装的 **DSH 0.2.2-rc.1**。本插件在 0.2.2 下**无需改代码**——用到的 `ctx.tools` / `ctx.effect` /
+`ctx.connection.rpc.handle` / `ctx.webServer` 契约与 `@deepseek-ai/dsh-client-ui-primitives` 的导出
+（`SettingsForm` / `SettingsFormModel` / `SettingsValueField` / `Button` / `Modal` / `Toast`）在 0.2.2 均未破坏。
+本次只补回归证据与版本记录。
+
+- **Host 行**：真实桌面版（profile `desktop`，行 `chrome-devtools`）`fiberPhase=active`；
+  `browser_status` 返回方案探测：`launch` 可用 / `auto-connect` 可用（当前，复用用户 Chrome）/ `browser-url` 不可用 /
+  `ws-endpoint` 未配置 —— 与机器实际状态一致。
+- **devkit web 沙箱**（`ui-chromedev`）：`dsh-chrome-devtools@0.1.3 is loaded: its client half is in the page's manifest`
+  （引号内是沙箱当时的实际输出，当时 link 的版本是 0.1.3；本次只升版本号 + 写文档，未改代码）；
+  真实点击流程（关「开始使用」→ 插件 → 查看 Chrome 浏览器）打开设置页：4 个方案下拉、渠道、Profile 目录、
+  工具集、截图目录、连接超时 15000 / 动作超时 10000 全部渲染；点「重新探测」走 RPC 拿回四方案探测结果；
+  全程**控制台 0 错误**。
+- **离线单测**：`node --test "test/**/*.test.mjs"` → **295 / 295 通过**。

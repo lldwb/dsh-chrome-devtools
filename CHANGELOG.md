@@ -2,6 +2,17 @@
 
 本文件记录 `dsh-chrome-devtools` 的所有重要变更。
 
+## 0.1.4 — 2026-11-06
+
+适配 **DSH 0.2.2-rc.1**。**无代码改动**——用到的 Host / Client 契约在 0.2.2 未发生破坏性变化，
+本次只补回归证据与版本记录（`node --test` 295/295 通过）。
+
+- 真实桌面版（0.2.2-rc.1，profile `desktop`）：`chrome-devtools` 行 `fiberPhase=active`；`browser_status` 正常
+  （`launch` 可用、`auto-connect` 可用且为当前方案、`browser-url` 不可用、`ws-endpoint` 未配置）。
+- devkit web 沙箱（`ui-chromedev`）UI 回归：client 半进入页面清单；点「插件 → Chrome 浏览器」进入设置页，
+  四方案下拉 / 渠道 / Profile 目录 / 工具集 / 截图目录 / 两个超时全部渲染，「重新探测」RPC 返回四方案可用性，
+  控制台 **0 错误**。
+
 ## 0.1.3 — 2026-10-27
 
 插件图标改为手绘 SVG，对齐 dsh 官方插件图标的矢量语言（36×36、透明底、官方蓝色渐变、同一描边与留白）：
