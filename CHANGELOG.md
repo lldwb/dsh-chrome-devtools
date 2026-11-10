@@ -2,6 +2,18 @@
 
 本文件记录 `dsh-chrome-devtools` 的所有重要变更。
 
+## 0.1.5 — 2026-11-10
+
+图标与「内置插件配置」卡片插画。
+
+- 重绘 `icon.svg`：36×36 蓝渐变浏览器窗口 + 三个白点 + 白色指针，一眼读出「浏览器自动化」；
+  与官方 artwork 同一套色板与构图语言（规范见 devkit skill
+  `dsh-plugin-development/references/icon-design-language.md`）。
+- client 半新增插画注册：`ITEM_ARTWORK_ID` / `ITEM_ARTWORK_URI` / `registerItemArtwork()`，
+  在 `apply()` 里把 `icon.svg` 的 data URI 登记进
+  `globalThis.__DSH_PLUGIN_ITEM_ARTWORK__['chrome-devtools']`。
+- 新增 `test/client-artwork.test.mjs`（6 用例，含逐字节一致与注册/注销语义）；`node --test` → 301/301 通过。
+
 ## 0.1.4 — 2026-11-06
 
 适配 **DSH 0.2.2-rc.1**。**无代码改动**——用到的 Host / Client 契约在 0.2.2 未发生破坏性变化，
