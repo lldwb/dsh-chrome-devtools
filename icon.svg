@@ -1,13 +1,13 @@
 <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect x="7" y="8" width="22" height="20" rx="2.8" fill="url(#cdtG1)"/>
-  <circle cx="10.4" cy="11.8" r="1" fill="#FFFFFF" fill-opacity="0.92"/>
-  <circle cx="13.4" cy="11.8" r="1" fill="#FFFFFF" fill-opacity="0.92"/>
-  <circle cx="16.4" cy="11.8" r="1" fill="#FFFFFF" fill-opacity="0.92"/>
-  <path d="M15.8 14.9V25.9L18.5 23.3L20.3 27.5L22.7 26.5L20.9 22.4L24.5 21.8L15.8 14.9Z" fill="#FFFFFF"/>
+  <rect x="7" y="7.4" width="22" height="20.2" rx="2.8" fill="url(#cdtWin)"/>
+  <path d="M9.8 7.4H26.2C27.7464 7.4 29 8.6536 29 10.2V11.6H7V10.2C7 8.6536 8.2536 7.4 9.8 7.4Z" fill="#324DE2" fill-opacity="0.45"/>
+  <circle cx="10.5" cy="9.5" r="0.85" fill="#FFFFFF"/>
+  <circle cx="13.1" cy="9.5" r="0.85" fill="#FFFFFF"/>
+  <circle cx="15.7" cy="9.5" r="0.85" fill="#FFFFFF"/>
+  <path d="M16.2 14.6V26.1L18.8 23.5L20.6 27.7L22.9 26.7L21.2 22.7L24.6 22.1L16.2 14.6Z" fill="#FFFFFF"/>
   <defs>
-    <linearGradient id="cdtG1" x1="18" y1="8" x2="18" y2="28" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#69B9FF"/>
-      <stop offset="1" stop-color="#324DE2"/>
+    <linearGradient id="cdtWin" x1="18" y1="7.4" x2="18" y2="27.6" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#69B9FF"/><stop offset="1" stop-color="#324DE2"/>
     </linearGradient>
   </defs>
 </svg>

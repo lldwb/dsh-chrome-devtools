@@ -2,6 +2,18 @@
 
 本文件记录 `dsh-chrome-devtools` 的所有重要变更。
 
+## 0.1.6 — 2026-11-11
+
+图标重绘与卡片插画同步。
+
+- 重绘 `icon.svg`：蓝渐变浏览器窗口 + **深色标题栏**（三个白点收进标题栏）+ 白色指针，
+  标题栏与内容区分明，缩到 16×16 仍能读出「浏览器自动化」；36×36、透明底、无容器、
+  官方色板与构图语言不变（规范见 devkit skill
+  `dsh-plugin-development/references/icon-design-language.md`）。
+- `client.js` 的 `ITEM_ARTWORK_URI` 用 `embed-plugin-artwork.mjs` 重新生成，与 `icon.svg`
+  逐字节一致（`embed-plugin-artwork.mjs . --check` → 状态: 一致）。
+- `node --test` → 301/301 通过。
+
 ## 0.1.5 — 2026-11-10
 
 图标与「内置插件配置」卡片插画。
