@@ -2,6 +2,20 @@
 
 本文件记录 `dsh-chrome-devtools` 的所有重要变更。
 
+## 0.1.8 — 2026-11-12
+
+适配 DSH `0.2.2-rc.2`：沙箱真实 Loader 回归通过，**无代码改动**。
+
+- 破坏面核查：`Session.append` 单事件/数组重载、runtime-context `<system-reminder>` 提醒包装、
+  `AttachmentError` 错误码、CUA / window-drag（macOS 专属）、web-search 计费、`BundleInfo.updatable`
+  均未涉及（全仓 grep 确认）；用到的 `ctx.tools` / `ctx.effect` / `ctx.connection.rpc.handle` /
+  `ctx.webServer` 契约与 `@deepseek-ai/dsh-client-ui-primitives` 导出在 rc.2 未变。
+- 真实 Loader 沙箱回归（devkit headless `a-chrome-devtools-regress`）：`create`/`install` exit 0 →
+  `compose` 合成树出现 `- id: chrome-devtools` / `name: dsh-chrome-devtools` → `devkit_sandbox_run`
+  （「调用 browser_status（无参数）并逐字贴出原始输出」）**exit 0**，工具真实调用、返回值过运行时
+  校验，无 `tool returned invalid output`。
+- 单测：`node --test "test/**/*.test.mjs"` → **313 pass / 0 fail**。
+
 ## 0.1.7 — 2026-11-12
 
 修复「设置页选方案 A、点『应用并连接』却提示『复用已有浏览器』」的误导

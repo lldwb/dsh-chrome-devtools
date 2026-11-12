@@ -189,6 +189,23 @@ Node 22/24 内置的全局 `WebSocket` 构造函数是 `new WebSocket(url, proto
   全程**控制台 0 错误**。
 - **离线单测**：`node --test "test/**/*.test.mjs"` → **295 / 295 通过**。
 
+### DSH 0.2.2-rc.2 回归（2026-11-12）
+
+适配目标：已安装的 **DSH 0.2.2-rc.2**。本插件在 rc.2 下**无需改代码**——用到的 `ctx.tools` /
+`ctx.effect` / `ctx.connection.rpc.handle` / `ctx.webServer` 契约与
+`@deepseek-ai/dsh-client-ui-primitives` 的导出在 rc.2 均未破坏；rc.2 破坏面
+（`Session.append` 重载、runtime-context `<system-reminder>` 包装、`AttachmentError` 错误码、
+CUA / window-drag（macOS）、web-search 计费、`BundleInfo.updatable`）本插件均未涉及（grep 确认）。
+
+- **devkit headless 沙箱**（`a-chrome-devtools-regress`，真实 Loader）：`create`/`install` exit 0 →
+  `compose` 合成树出现 `# == dsh-chrome-devtools` / `- id: chrome-devtools` /
+  `name: dsh-chrome-devtools` → `devkit_sandbox_run`（「调用 browser_status（无参数），把原始输出
+  逐字贴出来」）**exit 0**：工具真的被调用、返回值过运行时校验（`browser_status` 的 output 是文本
+  而非 JSON，模型如实贴出：未连接；四方案探测 launch ✅ / auto-connect ✅（当前，复用用户 Chrome，
+  调试端口 58295）/ browser-url ❌ / ws-endpoint ❌；`scheme=auto-connect · toolset=full ·
+  channel=stable`）；**无 `did not activate`、无 `tool returned invalid output`**。
+- **离线单测**：`node --test "test/**/*.test.mjs"` → **313 / 313 通过**。
+
 ## 图标
 
 包根 `icon.svg` 按 dsh 官方插件的矢量语言手绘：36×36 透明底、官方 artwork 调色板、一个意象。
