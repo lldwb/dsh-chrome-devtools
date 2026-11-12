@@ -78,7 +78,9 @@ const jsxRuntime = {
 };
 
 /** 页面对 `@deepseek-ai/dsh-client-ui-primitives` 的最小替身。 */
-function fakePrimitives() {
+function fakePrimitives(options = {}) {
+  /** 各字段的暂存文本（按用例配置；默认全空）。 */
+  const fieldText = options.fieldText ?? {};
   class FakeSettingsFormModel {
     constructor(scope, fields, secrets) {
       this.scope = scope;
@@ -110,7 +112,11 @@ function fakePrimitives() {
     }
 
     field(field) {
-      return { text: '', overridden: false, invalid: false };
+      return {
+        text: typeof fieldText[field] === 'string' ? fieldText[field] : '',
+        overridden: false,
+        invalid: false,
+      };
     }
 
     actions() {
@@ -155,15 +161,16 @@ function fakePrimitives() {
 /**
  * 执行 bundle 工厂，返回 exports 与 require 过的说明符。
  *
+ * @param {object} [options] - 传给 `fakePrimitives` 的选项（例如 `fieldText`）。
  * @returns {{ module: object, requested: string[] }}
  */
-function instantiateBundle() {
+function instantiateBundle(options = {}) {
   const { definition } = loadBundleDefinition();
   const requested = [];
   const module = definition.factory((specifier) => {
     requested.push(specifier);
     if (specifier === 'react/jsx-runtime') return jsxRuntime;
-    if (specifier === '@deepseek-ai/dsh-client-ui-primitives') return fakePrimitives();
+    if (specifier === '@deepseek-ai/dsh-client-ui-primitives') return fakePrimitives(options);
     throw new Error(`client.js require 了静态模块表之外的模块: ${specifier}`);
   });
   return { module, requested };
@@ -215,12 +222,31 @@ test('client.js 不写死本机绝对路径、不展示 emoji', () => {
 // ─── apply 冒烟 ────────────────────────────────────────────
 
 /**
+ * 默认的 connect RPC 返回值（方案 B：连用户正在用的浏览器）。
+ * 单个用例要测别的形状时用 `fakeClientCtx({ connectValue })` 覆盖。
+ */
+const DEFAULT_CONNECT_VALUE = {
+  connected: true,
+  scheme: 'auto-connect',
+  schemeLabel: '方案 B：复用当前浏览器（autoConnect）',
+  wsUrl: 'ws://127.0.0.1:9222/devtools/browser/x',
+  browserVersion: 'Chrome/155.0',
+  reused: false,
+  connectionReused: false,
+  browserReused: true,
+  launchedPid: 0,
+  note: '已连接到正在使用的 Chrome',
+};
+
+/**
  * 假浏览器插件上下文：记录 locale/槽位注册，并让 effect 立即执行、可回收。
  *
  * controller 构造时会调 `setInterval`（状态轮询）；测试期间换成假定时器，避免
  * 进程被 interval 挂住。
+ *
+ * @param {object} [options] - `connectValue`：connect 端点返回的 value（默认方案 B 形状）。
  */
-function fakeClientCtx() {
+function fakeClientCtx(options = {}) {
   const state = {
     registered: null,
     localeRegistered: null,
@@ -230,6 +256,8 @@ function fakeClientCtx() {
     effects: [],
     rpcCalls: [],
   };
+  /** 已注册的词典（namespace -> { zh, en }），供 locale.bind 解析真实文案。 */
+  const localeDictionaries = {};
   const scope = {
     subscribe: () => () => {},
     getSnapshot: () => ({ value: {} }),
@@ -243,8 +271,14 @@ function fakeClientCtx() {
       };
     },
     locale: {
-      bind: (namespace) => (key) => `${namespace}.${key}`,
+      // 与真实页面一致：先注册词典再绑定；中文优先（断言的是 zh 文案）。
+      bind: (namespace) => (key) => {
+        const dictionaries = localeDictionaries[namespace];
+        const value = dictionaries && dictionaries.zh ? dictionaries.zh[key] : undefined;
+        return typeof value === 'string' ? value : `${namespace}.${key}`;
+      },
       register: (namespace, dictionaries) => {
+        localeDictionaries[namespace] = dictionaries;
         state.localeRegistered = { namespace, dictionaries };
         return () => {};
       },
@@ -271,8 +305,11 @@ function fakeClientCtx() {
     },
     connection: {
       rpc: {
-        call: async (channel, endpoint) => {
-          state.rpcCalls.push([channel, endpoint]);
+        call: async (channel, endpoint, payload) => {
+          // 记录 payload：0.1.7 起「测试连接 / 应用并连接」必须显式带上表单选中的方案。
+          // payload 由 vm 里的 client.js 创建（跨 realm），转成本 realm 的普通对象再比较。
+          state.rpcCalls.push([channel, endpoint, payload === undefined ? undefined : JSON.parse(JSON.stringify(payload))]);
+          if (endpoint === 'connect') return { ok: true, value: options.connectValue ?? DEFAULT_CONNECT_VALUE };
           return {
             ok: true,
             value:
@@ -317,7 +354,8 @@ test('apply 在假 ctx 上跑通，并把设置页注册到 plugins.item（id = 
   assert.equal(typeof specification.order, 'number');
   assert.equal(specification.locale, module.NS);
   assert.equal(typeof component, 'function');
-  assert.equal(specification.label(), `${module.NS}.title`);
+  // locale.bind 在假 ctx 里解析真实词典：label 就是中文标题（不是 `ns.key` 占位）。
+  assert.equal(specification.label(), 'Chrome 浏览器');
 
   // 注入给页面的面孔：一个 hook store + 表单动作 + 四个 RPC 动作 + 方案探测刷新。
   const injected = specification.inject();
@@ -326,12 +364,181 @@ test('apply 在假 ctx 上跑通，并把设置页注册到 plugins.item（id = 
     assert.equal(typeof injected[action], 'function', `注入的面孔缺少 ${action}`);
   }
 
-  // 构造期发起过 status 与 probe 两个 RPC，通道与端点正确。
-  assert.deepEqual(state.rpcCalls[0], [RPC_CHANNEL, 'status']);
-  assert.deepEqual(state.rpcCalls[1], [RPC_CHANNEL, 'probe']);
+  // 构造期发起过 status 与 probe 两个 RPC，通道、端点与空 payload 正确。
+  assert.deepEqual(state.rpcCalls[0], [RPC_CHANNEL, 'status', {}]);
+  assert.deepEqual(state.rpcCalls[1], [RPC_CHANNEL, 'probe', {}]);
 
   // 回收 effect（controller.dispose 会清掉假 interval 与订阅）。
   for (const effect of state.effects.reverse()) effect.dispose();
+});
+
+// ─── 连接摘要文案与 RPC payload（0.1.7 修复） ────────────────
+
+/** 方案 A 启动的浏览器：RPC connect 返回值的默认形状。 */
+function launchConnectValue(overrides = {}) {
+  return {
+    connected: true,
+    scheme: 'launch',
+    schemeLabel: '方案 A：启动全新浏览器',
+    wsUrl: 'ws://127.0.0.1:9222/devtools/browser/x',
+    browserVersion: 'Chrome/155.0',
+    reused: false,
+    connectionReused: false,
+    browserReused: false,
+    launchedPid: 1001,
+    note: '已启动新的 Chrome（pid 1001）',
+    ...overrides,
+  };
+}
+
+/**
+ * 跑一次「测试连接 / 应用并连接」，返回结果文案、RPC 调用记录与页面快照。
+ *
+ * apply/test 都是 async：内部先 save 再调 RPC，`await` 之后还要 flush 一轮，
+ * 让 finally 里的状态轮询 / 方案探测结算，再从注入的 store 读快照。
+ *
+ * @param {'test' | 'apply'} action - 动作名。
+ * @param {object} [options] - `fieldText`（表单暂存文本）与 `connectValue`（connect 返回值）。
+ * @returns {Promise<{ text: string, snapshot: object, state: object }>}
+ */
+async function runConnectAction(action, options = {}) {
+  const { module } = instantiateBundle({ fieldText: options.fieldText });
+  const { ctx, state } = fakeClientCtx({ connectValue: options.connectValue });
+  module.apply(ctx);
+  await flush();
+  const injected = state.registered.specification.inject();
+  await injected[action]();
+  await flush();
+  const snapshot = injected.hooks.chromeDevtools.get();
+  for (const effect of state.effects.reverse()) effect.dispose();
+  return { text: snapshot && snapshot.message ? snapshot.message.text : '', snapshot, state };
+}
+
+test('连接摘要：方案 A 复用已建立的连接时显示方案标签与「复用已建立的连接」，不出现「复用已有浏览器」', async () => {
+  const connectValue = launchConnectValue({
+    reused: true,
+    connectionReused: true,
+    launchedPid: 1001,
+    note: '复用已建立的连接（方案 A：启动全新浏览器）',
+  });
+  for (const [action, prefix] of [
+    ['test', '连接成功'],
+    ['apply', '已应用并连接'],
+  ]) {
+    const { text } = await runConnectAction(action, { fieldText: { scheme: 'launch' }, connectValue });
+    assert.ok(text.startsWith(`${prefix}：`), `${action}：摘要前缀应为「${prefix}：」，实际：${text}`);
+    assert.ok(text.includes('方案 A：启动全新浏览器'), `${action}：摘要必须含实际方案标签，实际：${text}`);
+    assert.ok(text.includes('复用已建立的连接'), `${action}：摘要应说明复用已建立的连接，实际：${text}`);
+    assert.equal(text.includes('复用已有浏览器'), false, `${action}：不得再出现方案 B 的措辞，实际：${text}`);
+    assert.equal(
+      text.includes('复用你正在用的浏览器'),
+      false,
+      `${action}：不得把「复用连接」渲染成「复用浏览器」，实际：${text}`,
+    );
+  }
+});
+
+test('连接摘要：方案 A 新启动浏览器时显示「启动新浏览器」与 PID', async () => {
+  const { text } = await runConnectAction('apply', {
+    fieldText: { scheme: 'launch' },
+    connectValue: launchConnectValue(),
+  });
+  assert.ok(text.includes('方案 A：启动全新浏览器'), `摘要必须含实际方案标签，实际：${text}`);
+  assert.ok(text.includes('启动新浏览器'), `摘要应说明新启动，实际：${text}`);
+  assert.ok(text.includes('PID 1001'), `摘要应带 PID，实际：${text}`);
+  assert.equal(text.includes('复用已建立的连接'), false, `新启动不是复用连接，实际：${text}`);
+  assert.equal(text.includes('复用你正在用的浏览器'), false, `新启动不是复用浏览器，实际：${text}`);
+});
+
+test('连接摘要：方案 B 连用户正在用的浏览器时显示「复用你正在用的浏览器」', async () => {
+  const { text } = await runConnectAction('apply', {
+    fieldText: { scheme: 'auto-connect' },
+    connectValue: {
+      connected: true,
+      scheme: 'auto-connect',
+      schemeLabel: '方案 B：复用当前浏览器（autoConnect）',
+      wsUrl: 'ws://127.0.0.1:9222/devtools/browser/x',
+      browserVersion: 'Chrome/155.0',
+      reused: false,
+      connectionReused: false,
+      browserReused: true,
+      launchedPid: 0,
+      note: '已连接到正在使用的 Chrome',
+    },
+  });
+  assert.ok(text.includes('方案 B：复用当前浏览器（autoConnect）'), `摘要必须含实际方案标签，实际：${text}`);
+  assert.ok(text.includes('复用你正在用的浏览器'), `摘要应说明复用浏览器，实际：${text}`);
+  assert.equal(text.includes('复用已建立的连接'), false, `这不是复用连接，实际：${text}`);
+  assert.equal(text.includes('复用已有浏览器'), false, `旧措辞不应再出现，实际：${text}`);
+});
+
+test('连接摘要：方案 C/D 连外部 Chrome 时不冒充「复用你正在用的浏览器」', async () => {
+  for (const [scheme, label] of [
+    ['browser-url', '方案 C：连接调试端口（browser-url）'],
+    ['ws-endpoint', '方案 D：WebSocket 直连（wsEndpoint）'],
+  ]) {
+    const { text } = await runConnectAction('apply', {
+      fieldText: { scheme },
+      connectValue: {
+        connected: true,
+        scheme,
+        schemeLabel: label,
+        wsUrl: 'ws://127.0.0.1:9222/devtools/browser/x',
+        browserVersion: 'Chrome/155.0',
+        reused: false,
+        connectionReused: false,
+        browserReused: true,
+        launchedPid: 0,
+        note: '已连接到外部 Chrome',
+      },
+    });
+    assert.ok(text.includes(label), `${scheme}：摘要必须含实际方案标签，实际：${text}`);
+    assert.ok(text.includes('已连接到外部 Chrome'), `${scheme}：应说明连的是外部 Chrome，实际：${text}`);
+    assert.equal(
+      text.includes('复用你正在用的浏览器'),
+      false,
+      `${scheme}：C/D 不一定是用户日常浏览器，不得说「复用你正在用的浏览器」，实际：${text}`,
+    );
+  }
+});
+
+test('连接摘要：RPC 值缺 schemeLabel 时用客户端词典按 scheme id 补方案标签', async () => {
+  const { text } = await runConnectAction('test', {
+    fieldText: { scheme: 'launch' },
+    connectValue: launchConnectValue({ schemeLabel: undefined }),
+  });
+  assert.ok(text.includes('方案 A：启动全新浏览器'), `摘要必须含实际方案标签，实际：${text}`);
+});
+
+test('应用并连接 / 测试连接：RPC payload 显式携带表单选中的方案 id', async () => {
+  const applied = await runConnectAction('apply', {
+    fieldText: { scheme: 'launch' },
+    connectValue: launchConnectValue(),
+  });
+  const appliedConnect = applied.state.rpcCalls.filter((call) => call[1] === 'connect');
+  assert.equal(appliedConnect.length, 1, '一次动作只应调用一次 connect');
+  assert.deepEqual(appliedConnect[0], [RPC_CHANNEL, 'connect', { scheme: 'launch' }]);
+
+  const tested = await runConnectAction('test', {
+    fieldText: { scheme: 'auto-connect' },
+    connectValue: launchConnectValue(),
+  });
+  const testedConnect = tested.state.rpcCalls.filter((call) => call[1] === 'connect');
+  assert.deepEqual(testedConnect[0], [RPC_CHANNEL, 'connect', { scheme: 'auto-connect' }]);
+
+  // 表单文本不是合法方案 id（或只有空白）时不传，交给 Host 用已保存配置兜底。
+  for (const schemeText of ['not-a-scheme', '   ']) {
+    const fallback = await runConnectAction('test', {
+      fieldText: { scheme: schemeText },
+      connectValue: launchConnectValue(),
+    });
+    const fallbackConnect = fallback.state.rpcCalls.filter((call) => call[1] === 'connect');
+    assert.deepEqual(
+      fallbackConnect[0],
+      [RPC_CHANNEL, 'connect', {}],
+      `表单文本 ${JSON.stringify(schemeText)} 不应被当成方案传给 Host`,
+    );
+  }
 });
 
 // ─── 词典与 locale JSON ────────────────────────────────────
@@ -399,4 +606,23 @@ test('locale JSON 的标题与页面内嵌词典一致（两处不要各写一�
     assert.equal(json.settings.title, dictionaries[language].title);
     assert.equal(json.settings.description, dictionaries[language].description);
   }
+});
+
+test('连接摘要词典：reusedConnection / reusedBrowser 的中英文案与连接复用语义修复一致', async () => {
+  const dictionaries = await captureDictionaries();
+  assert.equal(dictionaries.zh.reusedConnection, '复用已建立的连接');
+  assert.equal(dictionaries.zh.reusedBrowser, '复用你正在用的浏览器');
+  assert.equal(
+    dictionaries.zh.reusedBrowser.includes('已有'),
+    false,
+    'reusedBrowser 不应再写成「复用已有浏览器」（方案 B 的旧措辞）',
+  );
+  for (const language of ['zh', 'en']) {
+    for (const key of ['reusedConnection', 'reusedBrowser', 'externalBrowser', 'launchedBrowser', 'versionLabel', 'summaryJoin', 'summarySeparator']) {
+      assert.equal(typeof dictionaries[language][key], 'string', `${language}.${key} 必须是字符串`);
+      assert.ok(dictionaries[language][key].trim().length > 0, `${language}.${key} 不能为空`);
+    }
+  }
+  assert.notEqual(dictionaries.en.reusedConnection, dictionaries.zh.reusedConnection, 'en 文案不应是中文');
+  assert.notEqual(dictionaries.en.reusedBrowser, dictionaries.zh.reusedBrowser, 'en 文案不应是中文');
 });

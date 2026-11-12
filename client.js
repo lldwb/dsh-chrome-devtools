@@ -132,7 +132,9 @@ window.__ModuleLoader__.load({
       closedOwnedBrowser: 'closed the browser this plugin launched',
       openPageSuccess: 'Opened a new tab',
       versionLabel: 'Chrome version',
-      reusedBrowser: 'reused an existing browser',
+      reusedBrowser: 'reused the browser you are using',
+      reusedConnection: 'reused the existing connection',
+      externalBrowser: 'connected to an external Chrome',
       launchedBrowser: 'launched a new browser',
       summaryJoin: ': ',
       summarySeparator: ', ',
@@ -239,7 +241,9 @@ window.__ModuleLoader__.load({
       closedOwnedBrowser: '已关闭本插件启动的浏览器',
       openPageSuccess: '已打开新标签页',
       versionLabel: 'Chrome 版本',
-      reusedBrowser: '复用已有浏览器',
+      reusedBrowser: '复用你正在用的浏览器',
+      reusedConnection: '复用已建立的连接',
+      externalBrowser: '已连接到外部 Chrome',
       launchedBrowser: '启动新浏览器',
       summaryJoin: '：',
       summarySeparator: '，',
@@ -1260,7 +1264,15 @@ window.__ModuleLoader__.load({
       }
 
       /**
-       * 把连接结果压成一句摘要，例如「连接成功：Chrome 版本 Chrome/155.0，复用已有浏览器」。
+       * 把连接结果压成一句摘要，例如
+       * 「已应用并连接：方案 A：启动全新浏览器，Chrome 版本 Chrome/155.0，复用已建立的连接」。
+       *
+       * 三种状态必须分开（0.1.7 修复）：
+       * - `connectionReused`：本次没有新建 CDP 连接（先「测试连接」再「应用并连接」会走到这里）；
+       * - `browserReused`：连的是用户正在用的浏览器（方案 B/C/D）；
+       * - `launchedPid > 0`：本插件新启动了一个 Chrome（方案 A）。
+       * 把前两者混成「复用已有浏览器」，用户就会以为方案 A 被换成了方案 B。
+       * 文案里始终带实际方案标签，用户一眼能看出当前用的是哪个方案。
        *
        * @param prefixKey - 前缀文案 key（testSuccess / applySuccess）。
        * @param value - RPC 返回的 connect 值。
@@ -1268,13 +1280,29 @@ window.__ModuleLoader__.load({
        */
       connectSummary(prefixKey, value) {
         const parts = [];
+        let schemeText = '';
+        if (value && typeof value.schemeLabel === 'string' && value.schemeLabel !== '') {
+          schemeText = value.schemeLabel;
+        } else if (value && typeof value.scheme === 'string' && value.scheme !== '') {
+          const option = SCHEMES.find((item) => item.id === value.scheme);
+          schemeText = option === undefined ? value.scheme : this.t(option.labelKey);
+        }
+        if (schemeText !== '') parts.push(schemeText);
         if (value && typeof value.browserVersion === 'string' && value.browserVersion !== '') {
           parts.push(`${this.t('versionLabel')} ${value.browserVersion}`);
         }
-        if (value && value.reused === true) {
-          parts.push(this.t('reusedBrowser'));
-        } else if (value && Number.isFinite(value.launchedPid) && value.launchedPid > 0) {
-          parts.push(`${this.t('launchedBrowser')} (PID ${value.launchedPid})`);
+        const launchedPid = value && Number.isFinite(value.launchedPid) ? value.launchedPid : 0;
+        const connectionReused = value !== null && typeof value === 'object' && value.connectionReused === true;
+        const browserReused = value !== null && typeof value === 'object' && value.browserReused === true;
+        if (connectionReused) {
+          parts.push(launchedPid > 0 ? `${this.t('reusedConnection')}（PID ${launchedPid}）` : this.t('reusedConnection'));
+        } else if (browserReused) {
+          // 只有方案 B 才真的是「你正在用的浏览器」；方案 C/D 连的是调试端口/远程端点，
+          // 说「复用你正在用的浏览器」同样会误导，统一说「已连接到外部 Chrome」。
+          const isAutoConnect = value !== null && typeof value === 'object' && value.scheme === 'auto-connect';
+          parts.push(this.t(isAutoConnect ? 'reusedBrowser' : 'externalBrowser'));
+        } else if (launchedPid > 0) {
+          parts.push(`${this.t('launchedBrowser')}（PID ${launchedPid}）`);
         }
         const prefix = this.t(prefixKey);
         if (parts.length === 0) return prefix;
@@ -1304,12 +1332,33 @@ window.__ModuleLoader__.load({
       }
 
       /**
+       * 「测试连接 / 应用并连接」要显式携带表单里选中的方案。
+       *
+       * 不能只依赖 `save()` 落盘后由 Host 读配置：两者之间只要有一拍竞态，用户看到的是
+       * 方案 A、实际连的却可能是上一次保存的方案。显式传 `scheme` 让「应用」等于「所见即所连」。
+       * 表单文本不是合法方案 id 时不传，交给 Host 用已保存配置兜底。
+       *
+       * @returns RPC 负载；无法确定方案时返回空对象。
+       */
+      connectPayload() {
+        try {
+          const field = typeof this.form.field === 'function' ? this.form.field('scheme') : undefined;
+          const text = field !== null && typeof field === 'object' && typeof field.text === 'string' ? field.text.trim() : '';
+          return SCHEMES.some((item) => item.id === text) ? { scheme: text } : {};
+        } catch {
+          // 表单模型版本差异不该让「应用」失败：拿不到就交给 Host 用已保存配置兜底。
+          return {};
+        }
+      }
+
+      /**
        * 执行一个动作：先保存表单，保存不干净则取消；再调用对应 RPC。
        *
        * @param kind - 用于按钮文案的动作名（test / apply / disconnect / openPage）。
        * @param endpoint - RPC 端点名。
+       * @param payloadBuilder - 可选的负载构造器（连接动作用它显式带上表单选中的方案）。
        */
-      async runAction(kind, endpoint) {
+      async runAction(kind, endpoint, payloadBuilder) {
         if (this.action !== null || this.disposed) return;
         this.action = kind;
         this.message = null;
@@ -1320,7 +1369,8 @@ window.__ModuleLoader__.load({
             this.message = { tone: 'error', text: this.t('saveBlocked') };
             return;
           }
-          const value = await this.call(endpoint);
+          const payload = typeof payloadBuilder === 'function' ? payloadBuilder() : undefined;
+          const value = await this.call(endpoint, payload);
           this.message = { tone: 'success', text: this.successText(kind, value) };
         } catch (error) {
           this.message = { tone: 'error', text: messageOf(error) || this.t('actionFailed') };
@@ -1341,8 +1391,8 @@ window.__ModuleLoader__.load({
           ...actions,
           // actions().save 丢弃了底层 Promise；动作按钮需要等真正落盘后再调 RPC。
           save: () => this.save(),
-          test: () => this.runAction('test', 'connect'),
-          apply: () => this.runAction('apply', 'connect'),
+          test: () => this.runAction('test', 'connect', () => this.connectPayload()),
+          apply: () => this.runAction('apply', 'connect', () => this.connectPayload()),
           disconnect: () => this.runAction('disconnect', 'disconnect'),
           openPage: () => this.runAction('openPage', 'openBrowserPage'),
           refreshProbe: () => this.refreshProbe()

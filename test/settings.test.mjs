@@ -529,6 +529,83 @@ test('connect 端点按 payload 指定方案调用 manager，并返回连接摘�
   );
 });
 
+test('connect 端点透传 connectionReused / browserReused / note / schemeLabel', async () => {
+  // 方案 A 先「测试连接」再「应用并连接」：复用的是已建立的 CDP 连接，不是复用浏览器。
+  const reusing = fakeManager({
+    async connect() {
+      return {
+        scheme: 'launch',
+        wsUrl: 'ws://user:pass@127.0.0.1:9222/devtools/browser/x',
+        browserVersion: 'Chrome/155.0',
+        reused: true,
+        connectionReused: true,
+        browserReused: false,
+        launchedPid: 1001,
+        note: '复用已建立的连接（方案 A：启动全新浏览器）',
+      };
+    },
+  });
+  const reusingResult = await createRpcHandler(fakeCtx(), { scheme: 'launch' }, reusing)('connect', { scheme: 'launch' });
+  assert.equal(reusingResult.ok, true);
+  assert.equal(reusingResult.value.connected, true);
+  assert.equal(reusingResult.value.scheme, 'launch');
+  assert.equal(reusingResult.value.schemeLabel, '方案 A：启动全新浏览器');
+  assert.equal(reusingResult.value.wsUrl, 'ws://***@127.0.0.1:9222/devtools/browser/x');
+  assert.equal(reusingResult.value.browserVersion, 'Chrome/155.0');
+  assert.equal(reusingResult.value.reused, true, 'reused 保留，等于 connectionReused');
+  assert.equal(reusingResult.value.connectionReused, true);
+  assert.equal(reusingResult.value.browserReused, false, '浏览器是本插件启动的');
+  assert.equal(reusingResult.value.launchedPid, 1001);
+  assert.equal(reusingResult.value.note, '复用已建立的连接（方案 A：启动全新浏览器）');
+
+  // 方案 C 连外部浏览器：browserReused 与 note 都要透传，reused 为 false。
+  const external = fakeManager({
+    async connect() {
+      return {
+        scheme: 'browser-url',
+        wsUrl: 'ws://127.0.0.1:9222/devtools/browser/x',
+        browserVersion: 'Chrome/155.0',
+        reused: false,
+        connectionReused: false,
+        browserReused: true,
+        launchedPid: 0,
+        note: '已连接到外部 Chrome',
+      };
+    },
+  });
+  const externalResult = await createRpcHandler(fakeCtx(), { scheme: 'browser-url' }, external)('connect', { scheme: 'browser-url' });
+  assert.equal(externalResult.value.scheme, 'browser-url');
+  assert.equal(externalResult.value.schemeLabel, '方案 C：连接调试端口（browser-url）');
+  assert.equal(externalResult.value.reused, false);
+  assert.equal(externalResult.value.connectionReused, false);
+  assert.equal(externalResult.value.browserReused, true);
+  assert.equal(externalResult.value.launchedPid, 0);
+  assert.equal(externalResult.value.note, '已连接到外部 Chrome');
+});
+
+test('connect 端点对只返回 reused:true 的旧 manager 保持向后兼容', async () => {
+  // 0.1.6 及更早的 manager 没有 connectionReused / browserReused / note 字段。
+  const manager = fakeManager({
+    async connect() {
+      return {
+        scheme: 'browser-url',
+        wsUrl: '',
+        browserVersion: '',
+        reused: true,
+        launchedPid: 0,
+      };
+    },
+  });
+  const result = await createRpcHandler(fakeCtx(), {}, manager)('connect', {});
+  assert.equal(result.ok, true);
+  assert.equal(result.value.reused, true);
+  assert.equal(result.value.connectionReused, true, '旧 manager 的 reused 视为「复用已建立的连接」');
+  assert.equal(result.value.browserReused, false, '缺 browserReused 时不能猜成「复用浏览器」');
+  assert.equal(result.value.launchedPid, 0);
+  assert.equal(result.value.note, '', '旧 manager 没有 note 时给空串');
+  assert.equal(result.value.schemeLabel, '方案 C：连接调试端口（browser-url）');
+});
+
 test('connect 端点缺省使用已保存配置的方案', async () => {
   const manager = fakeManager();
   const handler = createRpcHandler(fakeCtx(), { scheme: liveRef('launch') }, manager);

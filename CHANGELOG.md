@@ -2,6 +2,33 @@
 
 本文件记录 `dsh-chrome-devtools` 的所有重要变更。
 
+## 0.1.7 — 2026-11-12
+
+修复「设置页选方案 A、点『应用并连接』却提示『复用已有浏览器』」的误导
+（用户报告：明明选的是方案 A，看起来却像用了方案 B）。
+
+- **根因**：`lib/connection.mjs` 的 `connect()` 在「已有连接且方案相同」时提前返回
+  `reused: true` —— 它只表示「本次没有新建 CDP 连接」，与方案无关（方案 A 先点
+  「测试连接」再点「应用并连接」必然走到这里）。`client.js` 的 `connectSummary()`
+  把这个 `reused` 直接渲染成「复用已有浏览器」（方案 B 的措辞），而 RPC 已经返回的
+  `schemeLabel` 完全没用上。于是方案 A 复用已建立的连接被显示成方案 B，用户自然
+  以为插件偷偷换了方案（状态区的「当前方案」其实一直是对的）。
+- **修复**：把两个语义拆开 —— `connectionReused`（复用已建立的连接，与方案无关）与
+  `browserReused`（浏览器不是本插件启动的，即方案 B/C/D）。连接摘要固定显示**实际方案
+  标签**，并按 `connectionReused → browserReused → launchedPid>0` 选择措辞：「复用已建立
+  的连接（PID N）」/「复用你正在用的浏览器」（仅方案 B）/「已连接到外部 Chrome」（方案 C/D）/
+  「启动新浏览器（PID N）」。
+  「测试连接 / 应用并连接」现在把表单里选中的 `scheme` 显式放进 RPC payload，「应用」
+  等于「所见即所连」，不再依赖保存与读取配置之间的时序。
+  `browser_connect` 工具的 `note` 同步改为「复用已建立的连接（<方案标签>）」/
+  「新建连接（已启动 Chrome，pid N）」/「新建连接（已连接到外部 Chrome）」。
+- **兼容性**：`reused` 字段保留（= `connectionReused`），旧调用方不受影响；新增
+  `connectionReused` / `browserReused` / `note`。
+- **验证**：`npm test`（= `node --test "test/**/*.test.mjs"`）→ 312/312 通过；devkit web UI 沙箱真实界面回归：修复前逐字复现
+  「已应用并连接：Chrome 版本 …, 复用已有浏览器」，修复后同一操作显示
+  「已应用并连接：方案 A：启动全新浏览器，Chrome 版本 …, 复用已建立的连接（PID …）」，
+  状态区「当前方案」始终是方案 A。
+
 ## 0.1.6 — 2026-11-11
 
 图标重绘与卡片插画同步。

@@ -366,6 +366,9 @@ test('browser_connect / browser_disconnect', async () => {
   assert.equal(connect.reused, false);
   assert.equal(connect.wsUrl, 'ws://user:***@127.0.0.1:9222/devtools/browser/x');
   assert.equal(connect.launchedPid, 4321);
+  assert.equal(connect.schemeLabel, '方案 C：连接调试端口（browser-url）');
+  assert.equal(connect.note, '新建连接（已启动 Chrome，pid 4321）');
+  assert.ok(connect.summary.includes(connect.note), `summary 应含 note，实际：${connect.summary}`);
 
   const invalid = await tools.find((entry) => entry.name === 'browser_connect').execute({ scheme: 'browser-url' }, {});
   assert.equal(invalid.connected, true);
@@ -378,6 +381,90 @@ test('browser_connect / browser_disconnect', async () => {
   const disconnect = await tools.find((entry) => entry.name === 'browser_disconnect').execute({}, {});
   assert.equal(disconnect.disconnected, true);
   assert.equal(disconnect.closedOwnedBrowser, false);
+});
+
+test('browser_connect：note / summary 区分复用连接、新启动 Chrome、连外部浏览器', async () => {
+  const cases = [
+    {
+      title: '复用已建立的连接（方案 A 先测试再应用）',
+      result: {
+        scheme: 'launch',
+        wsUrl: 'ws://127.0.0.1:9222/devtools/browser/x',
+        browserVersion: 'Chrome/155.0.0',
+        reused: true,
+        connectionReused: true,
+        browserReused: false,
+        launchedPid: 1001,
+      },
+      expectedScheme: 'launch',
+      expectedLabel: '方案 A：启动全新浏览器',
+      expectedNote: '复用已建立的连接（方案 A：启动全新浏览器）',
+      expectedReused: true,
+    },
+    {
+      title: '新建连接（已启动 Chrome）',
+      result: {
+        scheme: 'launch',
+        wsUrl: 'ws://127.0.0.1:9222/devtools/browser/x',
+        browserVersion: 'Chrome/155.0.0',
+        reused: false,
+        connectionReused: false,
+        browserReused: false,
+        launchedPid: 4321,
+      },
+      expectedScheme: 'launch',
+      expectedLabel: '方案 A：启动全新浏览器',
+      expectedNote: '新建连接（已启动 Chrome，pid 4321）',
+      expectedReused: false,
+    },
+    {
+      title: '新建连接（已连接到外部 Chrome）',
+      result: {
+        scheme: 'browser-url',
+        wsUrl: 'ws://127.0.0.1:9222/devtools/browser/x',
+        browserVersion: 'Chrome/155.0.0',
+        reused: false,
+        connectionReused: false,
+        browserReused: true,
+        launchedPid: 0,
+      },
+      expectedScheme: 'browser-url',
+      expectedLabel: '方案 C：连接调试端口（browser-url）',
+      expectedNote: '新建连接（已连接到外部 Chrome）',
+      expectedReused: false,
+    },
+    {
+      title: '旧 manager 只返回 reused:true（向后兼容）',
+      result: {
+        scheme: 'launch',
+        wsUrl: 'ws://127.0.0.1:9222/devtools/browser/x',
+        browserVersion: 'Chrome/155.0.0',
+        reused: true,
+        launchedPid: 1001,
+      },
+      expectedScheme: 'launch',
+      expectedLabel: '方案 A：启动全新浏览器',
+      expectedNote: '复用已建立的连接（方案 A：启动全新浏览器）',
+      expectedReused: true,
+    },
+  ];
+  for (const item of cases) {
+    const harness = createHarness();
+    harness.manager.connect = async () => ({ ...item.result });
+    const tool = buildTools(harness.deps).find((entry) => entry.name === 'browser_connect');
+    const value = await tool.execute({}, {});
+    assert.equal(value.connected, true, item.title);
+    assert.equal(value.scheme, item.expectedScheme, item.title);
+    assert.equal(value.schemeLabel, item.expectedLabel, item.title);
+    assert.equal(value.reused, item.expectedReused, item.title);
+    assert.equal(value.note, item.expectedNote, item.title);
+    assert.ok(value.summary.includes(item.expectedNote), `${item.title}：summary 应含 note，实际：${value.summary}`);
+    // 0.1.7 之前把两种 reused 混成「复用已有连接/浏览器」；这个措辞不能再出现。
+    for (const wording of ['复用已有浏览器', '复用已有连接']) {
+      assert.equal(value.note.includes(wording), false, `${item.title}：note 不应出现旧措辞「${wording}」`);
+      assert.equal(value.summary.includes(wording), false, `${item.title}：summary 不应出现旧措辞「${wording}」`);
+    }
+  }
 });
 
 test('browser_disconnect：closeBrowser=true 且 manager 报告关闭了自有浏览器', async () => {

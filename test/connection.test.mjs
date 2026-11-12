@@ -257,9 +257,11 @@ test('connect：launch 方案建立连接并记录 pid / 版本 / 页面数', as
   const result = await manager.connect();
   assert.equal(result.scheme, 'launch');
   assert.equal(result.reused, false);
+  assert.equal(result.connectionReused, false, '新启动不是「复用已建立的连接」');
+  assert.equal(result.browserReused, false, 'launch 的浏览器是本插件启动的，不算复用浏览器');
   assert.equal(result.browserVersion, 'Chrome/Fake-1.0');
   assert.equal(result.launchedPid, 1001);
-  assert.equal(result.note, '');
+  assert.equal(result.note, '已启动新的 Chrome（pid 1001）');
   assert.equal(state.launchCalls, 1);
   assert.deepEqual(state.opens[0].wsUrl, 'ws://127.0.0.1:9001/devtools/browser/fake');
 
@@ -278,9 +280,56 @@ test('connect：同方案重复调用复用连接（不重复 launch）', async 
   const first = await manager.connect();
   const second = await manager.connect();
   assert.equal(second.reused, true);
+  assert.equal(second.connectionReused, true, 'reused 与 connectionReused 同值（向后兼容）');
+  assert.equal(second.browserReused, false, '浏览器仍是本插件启动的那个，不是「复用用户的浏览器」');
   assert.equal(second.scheme, first.scheme);
   assert.equal(second.launchedPid, first.launchedPid);
+  assert.equal(second.note, '复用已建立的连接（方案 A：启动全新浏览器）');
+  assert.equal(second.note.includes('复用已有浏览器'), false, 'note 不得使用方案 B 的措辞');
   assert.equal(state.launchCalls, 1);
+});
+
+test('connect：auto-connect 成功时连的是用户的浏览器（browserReused=true、pid=0）', async () => {
+  const { manager, state } = createHarness({ scheme: 'auto-connect' });
+  state.planImpl = async (scheme) => {
+    if (scheme === 'auto-connect') {
+      return { kind: 'ws', scheme, wsUrl: 'ws://127.0.0.1:9333/devtools/browser/fake', source: 'auto-connect' };
+    }
+    return launchPlan();
+  };
+  const result = await manager.connect();
+  assert.equal(result.scheme, 'auto-connect');
+  assert.equal(result.reused, false);
+  assert.equal(result.connectionReused, false);
+  assert.equal(result.browserReused, true, 'auto-connect 连的是用户正在用的浏览器');
+  assert.equal(result.launchedPid, 0);
+  assert.equal(result.note, '已连接到正在使用的 Chrome');
+  assert.equal(state.launchCalls, 0, 'auto-connect 不应启动新 Chrome');
+
+  // 再点一次「应用并连接」：复用的是已建立的 CDP 连接，浏览器仍然是用户的 → 两个标记都为 true。
+  const second = await manager.connect();
+  assert.equal(second.reused, true);
+  assert.equal(second.connectionReused, true);
+  assert.equal(second.browserReused, true);
+  assert.equal(second.launchedPid, 0);
+  assert.equal(second.note, '复用已建立的连接（方案 B：复用当前浏览器（autoConnect））');
+});
+
+test('connect：browser-url / ws-endpoint 连的是外部 Chrome（browserReused=true、pid=0、note 说明）', async () => {
+  for (const scheme of ['browser-url', 'ws-endpoint']) {
+    const { manager, state } = createHarness({
+      scheme,
+      wsEndpoint: 'ws://127.0.0.1:9444/devtools/browser/x',
+    });
+    const result = await manager.connect({ scheme });
+    assert.equal(result.scheme, scheme);
+    assert.equal(result.reused, false, `${scheme} 是新连接`);
+    assert.equal(result.connectionReused, false);
+    assert.equal(result.browserReused, true, `${scheme} 的浏览器不是本插件启动的`);
+    assert.equal(result.launchedPid, 0);
+    assert.equal(result.note, '已连接到外部 Chrome');
+    assert.equal(state.launchCalls, 0, `${scheme} 不应启动新 Chrome`);
+  }
 });
 
 test('connect：切换方案时先断开旧连接，并关掉自有 Chrome', async () => {
@@ -322,6 +371,9 @@ test('connect：auto-connect 不可用时回落到 launch，note 说明原因', 
   assert.equal(result.scheme, 'launch', '实际方案应为回落后的 launch');
   assert.match(result.note, /auto-connect 不可用/);
   assert.match(result.note, /DevToolsActivePort/);
+  assert.equal(result.connectionReused, false);
+  assert.equal(result.browserReused, false, '回落 launch 的浏览器是本插件启动的');
+  assert.equal(result.launchedPid, 1001);
   assert.equal(state.launchCalls, 1, '应真的执行了 launch');
   assert.equal(manager.status().connected, true);
 });
