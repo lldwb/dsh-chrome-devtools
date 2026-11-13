@@ -2,6 +2,31 @@
 
 本文件记录 `dsh-chrome-devtools` 的所有重要变更。
 
+## 0.1.9 — 2026-11-14
+
+适配 DSH `0.2.2-rc.3`：设置页 RPC 路由显式声明 `auth: 'required'`（向后兼容 rc.2）。
+
+- **变更**：`lib/settings.mjs` 的 `/dsh-chrome-devtools` prefix 路由在 `webServer.register()`
+  里显式声明 `auth: 'required'`。目标版本 WebServer 新增
+  `auth: 'anonymous' | 'required' | 'deny'`（`packages/host/webserver/src/index.ts` 的
+  `authPolicy()` 默认 `required`），官方 `client-connection` 的 `/api` 路由也显式写 `'required'`。
+  这条通道只给已登录的设置页用，显式写出来让「必须认证」进入注册契约，不再依赖默认值。
+- **认证语义不变**：handler 内继续 `connection.admit(req)`。rc.2 的 WebServer 完全不做路由
+  准入（`handle()` 直接 `responder.handler(req, res)`），`admit()` 是 rc.2 上唯一的认证；
+  目标版本 `admit()` 仍在且 `PeerAdmission` 形状不变（`{peer}` | `{rejection:401|403|503}`），
+  保留为双保险。
+- **向后兼容 rc.2**：rc.2 的 `register()` 只做 `(kind, path)` 去重后 `table.set()`，多出的
+  `auth` 键被静默忽略（已从本机 `app.asar` 的 rc.2 `dsh-host-webserver/lib/index.js` 核实）。
+- **MCP 相关 API 核对**：本插件**不使用** `ctx.mcp` 或任何 MCP 客户端 API——它是用 Node 内置
+  `fetch` + 全局 `WebSocket` 自建 CDP 客户端（`lib/cdp.mjs` / `lib/connection.mjs`），
+  因此目标版本的 MCP 变更与它无关（全仓 grep `mcp` 只命中文档/描述文字）。
+- **核对无其它破坏点**：`ctx.tools.register()`、`ctx.effect`、`settings.configure({auto:false}, fiber)`、
+  `configForms.get/whileServed`、`plugins.item` 槽位、`ctx.connection.rpc.call`、
+  `window.__ModuleLoader__.load({id, factory})` 均未变；未使用 `ctx.root`、`Service.config`、
+  `rankByName`、已删除包子路径等破坏点。
+- **验证**：`test/settings.test.mjs` 新增断言 `registered.auth === 'required'`（锁住这条安全
+  声明）；单测 `node --test "test/**/*.test.mjs"` → **313 pass / 0 fail**（断言数增加，用例数不变）。
+
 ## 0.1.8 — 2026-11-12
 
 适配 DSH `0.2.2-rc.2`：沙箱真实 Loader 回归通过，**无代码改动**。

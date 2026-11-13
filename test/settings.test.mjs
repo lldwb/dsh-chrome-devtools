@@ -757,6 +757,9 @@ test('installRpcChannel 同时 inject connection 与 webServer，并注册 prefi
   assert.equal(state.effects, 1);
   assert.equal(state.registered.kind, 'prefix');
   assert.equal(state.registered.path, RPC_CHANNEL);
+  // DSH 0.2.2-rc.3 起 WebServer 路由 auth 默认就是 required；这里锁住「显式写出来」，
+  // 避免以后有人删掉它而让这条设置页通道静默退回依赖默认值。
+  assert.equal(state.registered.auth, 'required');
   assert.equal(RPC_CHANNEL, '/dsh-chrome-devtools');
   assert.equal(typeof state.registered.handler, 'function');
 });
